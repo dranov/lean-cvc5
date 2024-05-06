@@ -21,14 +21,14 @@ def Lake.unzip (name : String) (file : FilePath) (dir : FilePath) : LogIO Unit :
 
 target libcvc5 pkg : Unit := do
   if !(← (pkg.lakeDir / "cvc5").pathExists) then
-    download "cvc5" "https://github.com/abdoo8080/cvc5/releases/download/v0.0.1/cvc5.zip" (pkg.lakeDir / "cvc5.zip")
+    download "https://github.com/abdoo8080/cvc5/releases/download/v0.0.1/cvc5.zip" (pkg.lakeDir / "cvc5.zip")
     unzip "cvc5" (pkg.lakeDir / "cvc5.zip") pkg.lakeDir
     IO.FS.removeFile (pkg.lakeDir / "cvc5.zip")
   return pure ()
 
 def Lake.compileStaticLib' (name : String) (libFile : FilePath)
-(oFiles : Array FilePath) (ar : FilePath := "ar") : BuildM Unit := do
-  logStep s!"Creating {name}"
+(oFiles : Array FilePath) (ar : FilePath := "ar") : JobM Unit := do
+  logInfo s!"Creating {name}"
   createParentDirs libFile
   proc {
     cmd := ar.toString
@@ -37,16 +37,18 @@ def Lake.compileStaticLib' (name : String) (libFile : FilePath)
 
 /-- Build a static library from object file jobs using the `ar` packaged with Lean. -/
 def Lake.buildStaticLib' (libFile : FilePath)
-(oFileJobs : Array (BuildJob FilePath)) : SchedulerM (BuildJob FilePath) :=
+(oFileJobs : Array (BuildJob FilePath)) : SpawnM (BuildJob FilePath) :=
   let name := libFile.fileName.getD libFile.toString
   buildFileAfterDepArray libFile oFileJobs fun oFiles => do
-    compileStaticLib' name libFile oFiles (← getLeanAr)
+    compileStaticLib' name libFile oFiles (← getLeanAr);
+    return ()
+
 
 target ffiO pkg : FilePath := do
   let oFile := pkg.buildDir / "ffi" / "ffi.o"
   let srcJob ← inputFile <| pkg.dir / "ffi" / "ffi.cpp"
   let flags := #["-stdlib=libc++", "-std=c++17", "-I", (← getLeanIncludeDir).toString, "-I", (pkg.lakeDir / "cvc5" / "include").toString, "-fPIC"]
-  buildO "ffi.cpp" oFile srcJob flags #[] "clang++-15"
+  buildO oFile srcJob flags #[] "clang++-15"
 
 extern_lib libffi pkg := do
   let name := nameToStaticLib "ffi"
