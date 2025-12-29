@@ -10,6 +10,7 @@ import cvc5.Kind
 import cvc5.ProofRule
 import cvc5.SkolemId
 import cvc5.Types
+import cvc5.ImportLakeCLIMain
 
 @[export prod_mk]
 private def mkProd := @Prod.mk
